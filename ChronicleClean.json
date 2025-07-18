@@ -1,0 +1,169 @@
+{
+  "name": "ChronicleClean",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "triggerAtHour": 3
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -200,
+        -20
+      ],
+      "id": "77fea9f9-d939-461c-ade3-7f27cd617b5f",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        200,
+        -20
+      ],
+      "id": "70fe3bca-6a47-4782-8755-b48e1f603fd2",
+      "name": "Loop Over Items"
+    },
+    {
+      "parameters": {
+        "operation": "archive",
+        "pageId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id",
+          "__regex": "^([0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12})"
+        }
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        420,
+        80
+      ],
+      "id": "f1e9853f-0beb-49bb-b9eb-31c125180cc8",
+      "name": "Archive Page",
+      "credentials": {
+        "notionApi": {
+          "id": "bS5u7P0XzqKiLNdI",
+          "name": "Notion account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "operation": "getAll",
+        "databaseId": {
+          "__rl": true,
+          "value": "22f78a97-8e69-803a-87d2-c85787a86b62",
+          "mode": "list",
+          "cachedResultName": "Article Digest (using n8n)",
+          "cachedResultUrl": "https://www.notion.so/22f78a978e69803a87d2c85787a86b62"
+        },
+        "returnAll": true,
+        "filterType": "manual",
+        "filters": {
+          "conditions": [
+            {
+              "key": "Published|date",
+              "condition": "before",
+              "date": "={{ new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        -20,
+        -20
+      ],
+      "id": "e6bbb7b3-7594-4300-a9ee-62af20b5e379",
+      "name": "Get Pages for Archiving",
+      "notesInFlow": true,
+      "credentials": {
+        "notionApi": {
+          "id": "bS5u7P0XzqKiLNdI",
+          "name": "Notion account"
+        }
+      },
+      "notes": "(Older than 14 days)"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Get Pages for Archiving",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Loop Over Items": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Archive Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Archive Page": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Pages for Archiving": {
+      "main": [
+        [
+          {
+            "node": "Loop Over Items",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "5ab9f31d-7674-4d78-95df-fb70b37bbb53",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9ca7622c186988ccda0dac864b90fcbe393f32b69bfb0060ead5b2ba90dd8042"
+  },
+  "id": "kOsHje71EhzmQvUe",
+  "tags": [
+    {
+      "createdAt": "2025-07-16T09:50:40.369Z",
+      "updatedAt": "2025-07-16T09:50:40.369Z",
+      "id": "0wPf8NF8LPW0BZgH",
+      "name": "Notion"
+    }
+  ]
+}

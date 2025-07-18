@@ -1,0 +1,408 @@
+{
+  "name": "ChronicleFeed",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 3
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        -220,
+        0
+      ],
+      "id": "61b0a2c0-cd2f-43bb-8e34-cd1b90c202c2",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.feedUrl }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.rssFeedRead",
+      "typeVersion": 1.2,
+      "position": [
+        100,
+        0
+      ],
+      "id": "54ed5256-edb8-484d-b3de-61c7e7e7f290",
+      "name": "RSS Read",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const sourceData = $('RSS URLs Provider').item.json;\n\nconst cleanedCategories = Array.isArray($json.categories)\n  ? $json.categories.map(cat => cat.replace(/,/g, ''))\n  : [];\n\nreturn {\n  title: $json.title,\n  link: $json.link,\n  description: $json.contentSnippet,\n  pubDate: $json.pubDate,\n  sourceName: sourceData.feedName,\n  category: cleanedCategories\n};\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        420,
+        0
+      ],
+      "id": "c1b99837-6b35-49d2-9711-40fd11bf8679",
+      "name": "Add Metadata"
+    },
+    {
+      "parameters": {
+        "model": "llama3.1:latest",
+        "options": {
+          "temperature": 0.3,
+          "topP": 0.9
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [
+        640,
+        280
+      ],
+      "id": "5055caff-cdd7-41de-8269-2a5f73715f13",
+      "name": "Ollama Chat Model",
+      "credentials": {
+        "ollamaApi": {
+          "id": "L0T0UatbdYEWyfBa",
+          "name": "Ollama account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=You are an AI assistant for summarizing blog or news content. For each input item, return a very brief summary (1 sentence) of the content, and extract the top 4 most important tags (excluding any that are duplicates, author names, or irrelevant).\n\nHere is the blog post:\n\nTitle: {{$json[\"title\"]}}\nURL: {{$json[\"link\"]}}\nPublished: {{$json[\"pubDate\"]}}\n\nTags: {{ $json.category }}\n\nContent:\n{{ $json.description }}\n\nRespond only in valid JSON format, like this (no extra commentary, no markdown, just plain JSON):\n\n{\n  \"summary\": \"...\",\n  \"category\": [\"tag1\", \"tag2\", \"tag3\", \"tag4\"]\n}\n\nRules for tags:\n\n- Only keep the 4 most relevant and distinct tags.\n- Ignore any tags that match or closely resemble the author’s name.\n- Avoid near duplicates (e.g., singular/plural, case variants, similar meaning).\n- Order by relevance to the content, not by appearance.",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        640,
+        100
+      ],
+      "id": "a03b19cc-b89f-4c61-826a-1a536ce7b42e",
+      "name": "Summarizer"
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const parsed = JSON.parse($json.output);\n\nreturn {\n  summary: parsed[\"summary\"],\n  category: parsed[\"category\"]\n}"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        960,
+        100
+      ],
+      "id": "71d89fba-363b-4477-8d5f-f932047d900d",
+      "name": "Output to Summary JSON Object"
+    },
+    {
+      "parameters": {
+        "jsCode": "const rssFeeds = [\n  {\n    name: \"The Decoder\",\n    url: \"https://the-decoder.com/feed/\"\n  },\n  {\n    name: \"Towards Data Science\",\n    url: \"https://towardsdatascience.com/feed\"\n  },\n  {\n    name: \"Google AI Blog\",\n    url: \"https://blog.research.google/feeds/posts/default\"\n  },\n  {\n    name: \"OpenAI Blog\", \n    url: \"https://openrss.org/openai.com/news/rss.xml\"\n  },\n  {\n    name: \"GitHub Blog - AI\",\n    url: \"https://github.blog/tag/ai/feed/\"\n  },\n  {\n    name: \"VentureBeat - AI\",\n    url: \"https://venturebeat.com/category/ai/feed/\"\n  }\n];\n\nreturn rssFeeds.map((feed, index) => ({\n  feedName: feed.name,\n  feedUrl: feed.url,\n  feedIndex: index,\n  timestamp: new Date().toISOString()\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -60,
+        0
+      ],
+      "id": "9c195a71-1d56-4d0a-bc5b-e641ca506a9c",
+      "name": "RSS URLs Provider",
+      "notesInFlow": false
+    },
+    {
+      "parameters": {
+        "mode": "combine",
+        "combineBy": "combineByPosition",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        1180,
+        0
+      ],
+      "id": "bfce29ec-1adc-4adc-a330-a2538e3ec325",
+      "name": "Merge Metadata and Summary"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "35321899-a6ea-42e0-b690-9f0791c6c71d",
+              "leftValue": "={{ $json.pubDate }}",
+              "rightValue": "={{ new Date(Date.now() - 3 * 60 * 60 * 1000).toISOString() }}",
+              "operator": {
+                "type": "dateTime",
+                "operation": "afterOrEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.filter",
+      "typeVersion": 2.2,
+      "position": [
+        260,
+        0
+      ],
+      "id": "30d1a582-7027-4cc2-a4c8-9a9ba968f333",
+      "name": "Recency Filter"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c43341da-a398-48d0-9d18-022329b55454",
+              "name": "title",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "1c211115-18b8-4c19-a903-4e0cbe982bbf",
+              "name": "link",
+              "value": "={{ $json.link }}",
+              "type": "string"
+            },
+            {
+              "id": "0223b070-7ea7-4073-a78e-10b2b795e06a",
+              "name": "pubDate",
+              "value": "={{ $json.pubDate }}",
+              "type": "string"
+            },
+            {
+              "id": "1236d1f1-cd6d-44a5-a5f9-c7132532325b",
+              "name": "sourceName",
+              "value": "={{ $json.sourceName }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        800,
+        -100
+      ],
+      "id": "d3c8c1e3-8299-4291-98c0-63fcfbc9d3a1",
+      "name": "Filtering Unwanted Columns",
+      "notesInFlow": true
+    },
+    {
+      "parameters": {
+        "resource": "databasePage",
+        "databaseId": {
+          "__rl": true,
+          "value": "22f78a97-8e69-803a-87d2-c85787a86b62",
+          "mode": "list",
+          "cachedResultName": "Article Digest (using n8n)",
+          "cachedResultUrl": "https://www.notion.so/22f78a978e69803a87d2c85787a86b62"
+        },
+        "title": "={{ $json.title }}",
+        "propertiesUi": {
+          "propertyValues": [
+            {
+              "key": "Category|multi_select",
+              "multiSelectValue": "={{ $json.category }}"
+            },
+            {
+              "key": "Published|date",
+              "date": "={{ $json.pubDate }}",
+              "timezone": "Asia/Kolkata"
+            },
+            {
+              "key": "Source|rich_text",
+              "textContent": "={{ $json.sourceName }}"
+            },
+            {
+              "key": "Summary|rich_text",
+              "textContent": "={{ $json.summary }}"
+            },
+            {
+              "key": "URL|url",
+              "urlValue": "={{ $json.link }}"
+            },
+            {
+              "key": "Title|title",
+              "title": "={{ $json.title }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.notion",
+      "typeVersion": 2.2,
+      "position": [
+        1360,
+        0
+      ],
+      "id": "b76612e1-a3ee-4810-b8b7-f584ccc2f92d",
+      "name": "Create DB Page",
+      "retryOnFail": false,
+      "notesInFlow": false,
+      "credentials": {
+        "notionApi": {
+          "id": "bS5u7P0XzqKiLNdI",
+          "name": "Notion account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "RSS URLs Provider",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "RSS Read": {
+      "main": [
+        [
+          {
+            "node": "Recency Filter",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Add Metadata": {
+      "main": [
+        [
+          {
+            "node": "Summarizer",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Filtering Unwanted Columns",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ollama Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Summarizer",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Summarizer": {
+      "main": [
+        [
+          {
+            "node": "Output to Summary JSON Object",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output to Summary JSON Object": {
+      "main": [
+        [
+          {
+            "node": "Merge Metadata and Summary",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "RSS URLs Provider": {
+      "main": [
+        [
+          {
+            "node": "RSS Read",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Merge Metadata and Summary": {
+      "main": [
+        [
+          {
+            "node": "Create DB Page",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Recency Filter": {
+      "main": [
+        [
+          {
+            "node": "Add Metadata",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filtering Unwanted Columns": {
+      "main": [
+        [
+          {
+            "node": "Merge Metadata and Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Asia/Kolkata",
+    "callerPolicy": "workflowsFromSameOwner",
+    "executionTimeout": -1
+  },
+  "versionId": "f47042f7-fc7b-4fb7-8364-32c48bfddce1",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "9ca7622c186988ccda0dac864b90fcbe393f32b69bfb0060ead5b2ba90dd8042"
+  },
+  "id": "46JYv2VxUedqfezw",
+  "tags": [
+    {
+      "createdAt": "2025-07-16T09:50:40.369Z",
+      "updatedAt": "2025-07-16T09:50:40.369Z",
+      "id": "0wPf8NF8LPW0BZgH",
+      "name": "Notion"
+    }
+  ]
+}
